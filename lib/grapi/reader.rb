@@ -7,8 +7,21 @@ module Grapi
   class Reader
 
     VERSION = File.read(File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "VERSION"))).strip
-
+    
     def initialize(verbose= false)
+    
+      @google_url = 'https://www.google.com'
+      @reader_url = @google_url + '/reader'
+      @login_url = @google_url + '/accounts/ClientLogin'  
+      @token_url = @reader_url + '/api/0/token'
+      @subscription_list_url = @reader_url + '/api/0/subscription/list'  
+      @reading_url = @reader_url + '/atom/user/-/state/com.google/reading-list'  
+      @read_items_url = @reader_url + '/atom/user/-/state/com.google/read'  
+      @reading_tag_url = @reader_url + '/atom/user/-/label/%s'  
+      @starred_url = @reader_url + '/atom/user/-/state/com.google/starred'  
+      @subscription_url = @reader_url + '/api/0/subscription/edit'
+      @get_feed_url = @reader_url + '/atom/feed/' 
+      
       @client = ::Curl::Easy.new do | easy |
         easy.headers= {
           "User-Agent"      => "Grapi::Reader /#{Grapi::Reader::VERSION} +gzip",
@@ -22,7 +35,7 @@ module Grapi
     end
 
     def login(username, password)
-      post "https://www.google.com/accounts/ClientLogin", {
+      post @login_url, {
         "Email" => username,
         "Passwd" => password,
         "source" => @client.headers["User-Agent"],
@@ -30,6 +43,7 @@ module Grapi
         "accountType" => "HOSTED_OR_GOOGLE"
       }
       @client.body_str.uncompress =~ /^SID=(.*)\n/
+      puts "SID=#{$1}"
       @client.headers['Cookie']= "SID=#{$1}"
       self
     end
@@ -59,9 +73,24 @@ module Grapi
     def reading_list(options={})
       options= {:continuation => nil, :output => "atom", :dump_data => false}.update(options)
       if options[:output] == "atom"
-        get "http://www.google.com/reader/atom/user/-/state/com.google/reading-list?xt=user/-/state/com.google/read&ck=#{Time.now.to_i*1000}&n=1000&c=#{options[:continuation]}"
+        get @reading_url + "?xt=user/-/state/com.google/read&ck=#{Time.now.to_i*1000}&n=1&c=#{options[:continuation]}"
       else
-        get "http://www.google.com/reader/api/0/stream/contents/user/-/state/com.google/reading-list?output=#{options[:output]}&xt=user/-/state/com.google/read&ck=#{Time.now.to_i*1000}&n=1000&c=#{options[:continuation]}"
+        get @reading_url + "?output=#{options[:output]}&xt=user/-/state/com.google/read&ck=#{Time.now.to_i*1000}&n=1&c=#{options[:continuation]}"
+      end
+      response= @client.body_str.uncompress
+      File.open("/tmp/#{Time.now.to_i}-reading_list.#{options[:output]}", "w"){|f|f<<response} if options[:dump_data]
+      response
+    end
+    
+    # Returns the tagged items specified in options
+    #	:tag => "tagname"
+    
+    def tag_list(options={})
+      options = {:continuation => nil, :output => "atom", :dump_data => false, :items => 1 || :items}.update(options)
+      if options[:output] == "atom"
+        get sprintf(@reading_tag_url,options[:tag]) + "?ck=#{Time.now.to_i*1000}&n=#{options[:items]}&c=#{options[:continuation]}"
+      else
+        get @reading_tag_url + "?output=#{options[:output]}&ck=#{Time.now.to_i*1000}&n=#{options[:items]}&c=#{options[:continuation]}"
       end
       response= @client.body_str.uncompress
       File.open("/tmp/#{Time.now.to_i}-reading_list.#{options[:output]}", "w"){|f|f<<response} if options[:dump_data]
@@ -91,6 +120,7 @@ module Grapi
       end
 
     private
+      
       def edit_subscription(feed_url, action, params={})
         post_with_token "http://www.google.com/reader/api/0/subscription/edit", { "s" => "feed/#{feed_url}", "ac" => action }.update(params)
         response= @client.body_str.uncompress
