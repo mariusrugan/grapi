@@ -75,7 +75,7 @@ module Grapi
     #   :output (default: atom) -> desired output (atom|json)
     #   :items (default: 1) -> number of items to fetch
     def reading_list(options={})
-      options= {:continuation => nil, :output => "atom", :dump_data => false, :items => 1 || :items}.update(options)
+      options= {:continuation => nil, :output => "atom", :dump_data => false, :items => 1 }.update(options)
       if options[:output] == "atom"
         get @reading_url + "?xt=user/-/state/com.google/read&ck=#{Time.now.to_i*1000}&n=#{options[:items]}&c=#{options[:continuation]}"
       else
@@ -95,7 +95,7 @@ module Grapi
     #   :output (default: atom) -> desired output (atom|json)
     #   :items (default: 1) -> number of items to fetch
     def tag_list(options={})
-      options = {:continuation => nil, :output => "atom", :dump_data => false, :items => 1 || :items}.update(options)
+      options = {:continuation => nil, :output => "atom", :dump_data => false, :items => 1}.update(options)
       if options[:output] == "atom"
         get sprintf(@reading_tag_url,options[:tag]) + "?ck=#{Time.now.to_i*1000}&n=#{options[:items]}&c=#{options[:continuation]}"
       else
