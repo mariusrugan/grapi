@@ -43,7 +43,7 @@ module Grapi
         "accountType" => "HOSTED_OR_GOOGLE"
       }
       @client.body_str.uncompress =~ /^SID=(.*)\n/
-      puts "SID=#{$1}"
+      puts "SID=#{$1}"+"\n"
       @client.headers['Cookie']= "SID=#{$1}"
       self
     end
@@ -66,31 +66,40 @@ module Grapi
       self
     end
 
+    # fetches & excludes (xt=*) read items
+    # returns:
+    #
     # options:
     #   :continuation (default: nil) -> continuation string
     #   :dump_data (default: false) -> whether to write the response to a file in /tmp or not
     #   :output (default: atom) -> desired output (atom|json)
+    #   :items (default: 1) -> number of items to fetch
     def reading_list(options={})
-      options= {:continuation => nil, :output => "atom", :dump_data => false}.update(options)
+      options= {:continuation => nil, :output => "atom", :dump_data => false, :items => 1 || :items}.update(options)
       if options[:output] == "atom"
-        get @reading_url + "?xt=user/-/state/com.google/read&ck=#{Time.now.to_i*1000}&n=1&c=#{options[:continuation]}"
+        get @reading_url + "?xt=user/-/state/com.google/read&ck=#{Time.now.to_i*1000}&n=#{options[:items]}&c=#{options[:continuation]}"
       else
-        get @reading_url + "?output=#{options[:output]}&xt=user/-/state/com.google/read&ck=#{Time.now.to_i*1000}&n=1&c=#{options[:continuation]}"
+        get @reading_url + "?output=#{options[:output]}&xt=user/-/state/com.google/read&ck=#{Time.now.to_i*1000}&n=#{options[:items]}&c=#{options[:continuation]}"
       end
       response= @client.body_str.uncompress
       File.open("/tmp/#{Time.now.to_i}-reading_list.#{options[:output]}", "w"){|f|f<<response} if options[:dump_data]
       response
     end
     
-    # Returns the tagged items specified in options
-    #	:tag => "tagname"
-    
+    # fetches and returns the tagged items specified in options
+    # returns:
+    # options:
+    #   :tag => "tagname"
+    #   :continuation (default: nil) -> continuation string
+    #   :dump_data (default: false) -> whether to write the response to a file in /tmp or not
+    #   :output (default: atom) -> desired output (atom|json)
+    #   :items (default: 1) -> number of items to fetch
     def tag_list(options={})
       options = {:continuation => nil, :output => "atom", :dump_data => false, :items => 1 || :items}.update(options)
       if options[:output] == "atom"
         get sprintf(@reading_tag_url,options[:tag]) + "?ck=#{Time.now.to_i*1000}&n=#{options[:items]}&c=#{options[:continuation]}"
       else
-        get @reading_tag_url + "?output=#{options[:output]}&ck=#{Time.now.to_i*1000}&n=#{options[:items]}&c=#{options[:continuation]}"
+        get sprintf(@reading_tag_url,options[:tag]) + "?output=#{options[:output]}&ck=#{Time.now.to_i*1000}&n=#{options[:items]}&c=#{options[:continuation]}"
       end
       response= @client.body_str.uncompress
       File.open("/tmp/#{Time.now.to_i}-reading_list.#{options[:output]}", "w"){|f|f<<response} if options[:dump_data]
@@ -98,6 +107,7 @@ module Grapi
     end
 
     protected
+      
       def get(url)
         make_request(url){|c| c.http_get }
       end
